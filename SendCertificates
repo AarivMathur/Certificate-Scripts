@@ -1,0 +1,47 @@
+function sendCertificates() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Form Responses 1");
+  const rows = sheet.getDataRange().getValues();
+  const templateFile = DriveApp.getFileById('1QoD35fywHdXRdUfVdU_FTSSGy8UceYnZisUsqGqCRJ4'); 
+
+  for (let i = 1; i < rows.length; i++) {
+    const name = rows[i][2];
+    const email = rows[i][1]; 
+    const date = new Date(rows[i][3]);
+    const emailSent = rows[i][4];  // Assuming the "Email Sent" column is in the 5th column (E)
+
+    if (!email || emailSent === "Yes") {
+      Logger.log("Skipping row " + (i + 1) + " (no email or email already sent)");
+      continue;  // Skip this iteration if email is empty or already sent
+    }
+    
+    const formattedDate = Utilities.formatDate(date, Session.getScriptTimeZone(), 'MMMM d, yyyy');
+
+    const newSlide = templateFile.makeCopy();
+    const slides = SlidesApp.openById(newSlide.getId());
+    const slide = slides.getSlides()[0];
+
+    // Replace the placeholder with the actual name and date
+    slide.replaceAllText('{{Name}}', name);
+    slide.replaceAllText('{{Date}}', formattedDate);
+
+    // Save and send the certificate
+    slides.saveAndClose();
+    const pdf = newSlide.getAs('application/pdf');
+    
+    // Send email
+    try {
+      MailApp.sendEmail({
+        to: email,
+        subject: "Your Certificate of Completion",
+        body: "Congratulations! Attached is your certificate of completion.",
+        attachments: [pdf]
+      });
+      Logger.log("Email sent to: " + email);
+      
+      // Mark the email as sent
+      sheet.getRange(i + 1, 5).setValue("Yes");  // Update the "Email Sent" column
+    } catch (e) {
+      Logger.log("Failed to send email to: " + email + " with error: " + e.message);
+    }
+  }
+}
